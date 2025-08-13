@@ -2,16 +2,64 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import SignaturePad from "signature_pad";
+import dynamic from "next/dynamic";
+
+// Dynamic PDF Viewer Component
+const PDFViewer = dynamic(
+  () => {
+    return import("react-pdf").then((mod) => {
+      // Set up worker here as well
+      mod.pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${mod.pdfjs.version}/pdf.worker.min.js`;
+
+      return function PDFViewerComponent({
+        file,
+        onLoadSuccess,
+        width,
+      }: {
+        file: File;
+        onLoadSuccess: (data: { numPages: number }) => void;
+        width: number;
+      }) {
+        return (
+          <mod.Document file={file} onLoadSuccess={onLoadSuccess}>
+            <mod.Page pageNumber={1} width={width} />
+          </mod.Document>
+        );
+      };
+    });
+  },
+  {
+    ssr: false,
+    loading: () => <div className="text-center p-4">Loading PDF viewer...</div>,
+  }
+);
+
+// Set up PDF.js worker in useEffect to avoid SSR issues
+let isWorkerSet = false;
+
+// Import dynamique pour SignatureCanvas
+const SignatureCanvas = dynamic(() => import("react-signature-canvas"), {
+  ssr: false,
+});
 
 export default function SignaturePage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sigRef = useRef<any>(null);
   const [isEmpty, setIsEmpty] = useState(true);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
-  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [numPages, setNumPages] = useState(1);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [isClient, setIsClient] = useState(false);
 
-  // helper: dataURL -> Blob (utile si tu veux uploader)
+  // signature position
+  const [sigX, setSigX] = useState(50);
+  const [sigY, setSigY] = useState(50);
+  const [sigWidth, setSigWidth] = useState(150);
+  const [dragging, setDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  // helper: dataURL -> Blob
   const dataURLToBlob = (dataURL: string) => {
     const parts = dataURL.split(",");
     const mimeMatch = parts[0].match(/:(.*?);/);
@@ -23,32 +71,22 @@ export default function SignaturePage() {
     return new Blob([u8], { type: mime });
   };
 
-  // Enregistrer la signature et afficher l'aperçu à droite
+  // Enregistrer la signature
   const saveSignature = useCallback(() => {
     const sig = sigRef.current;
     if (!sig || sig.isEmpty()) return;
-
-    // signature_pad expose toDataURL
     const dataUrl = sig.toDataURL("image/png");
     setPreview(dataUrl);
-
-    // créer blob (optionnel: prêt pour upload)
-    const blob = dataURLToBlob(dataUrl);
-    setPreviewBlob(blob);
-
-    // exemple: console log
-    console.log("Signature sauvegardée (dataUrl):", dataUrl);
-    // si tu veux uploader: envoie `blob` via fetch/FormData
   }, []);
 
   // Effacer tout
   const clear = useCallback(() => {
     sigRef.current?.clear();
     setIsEmpty(true);
-    // on peut conserver l'aperçu même après effacement (choix UX)
+    setPreview(null);
   }, []);
 
-  // Undo dernier trait (Retour)
+  // Undo
   const undo = useCallback(() => {
     const sig = sigRef.current;
     if (!sig) return;
@@ -59,7 +97,20 @@ export default function SignaturePage() {
     setIsEmpty(sig.isEmpty());
   }, []);
 
-  // Init signature_pad + resize handling
+  // Setup client-side environment
+  useEffect(() => {
+    setIsClient(true);
+
+    // Setup PDF.js worker
+    if (!isWorkerSet) {
+      import("react-pdf").then((mod) => {
+        mod.pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${mod.pdfjs.version}/pdf.worker.min.js`;
+        isWorkerSet = true;
+      });
+    }
+  }, []);
+
+  // Init signature_pad
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -72,149 +123,139 @@ export default function SignaturePage() {
     });
     sigRef.current = sig;
 
-    // gérer état début/fin dessin
-    // signature_pad permet d'assigner les callbacks
-    sig.onBegin = () => {
-      setIsDrawing(true);
-    };
-    sig.onEnd = () => {
-      setIsDrawing(false);
-      setIsEmpty(sig.isEmpty());
-    };
+    sig.onBegin = () => setIsEmpty(false);
+
+    sig.onEnd = () => setIsEmpty(sig.isEmpty());
 
     const resizeCanvas = () => {
-      // NOTE: on choisit ici de *réinitialiser* lors du resize pour garder la précision.
-      // Si tu veux garder la signature après resize, on peut sauvegarder les données puis les restaurer (plus loin).
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
       const parent = canvas.parentElement;
       if (!parent) return;
-
-      const width = Math.min(700, parent.clientWidth); // max width 700 (comme avant)
+      const width = Math.min(700, parent.clientWidth);
       const height = 260;
-
-      // mettre la taille en pixels réels
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
-
-      // taille CSS visible
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
-
       const ctx = canvas.getContext("2d");
-      if (ctx) {
-        // reset transform puis appliquer ratio (évite facteur d'échelle cumulatif)
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      }
-
-      // on clear pour éviter artefacts; si tu veux conserver, il faut sauvegarder et rescaler les points
+      if (ctx) ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       sig.clear();
       setIsEmpty(true);
     };
 
-    // initial resize + listener
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
-    return () => {
-      window.removeEventListener("resize", resizeCanvas);
-      sig.off && sig.off(); // si signature_pad expose off
-    };
+    return () => window.removeEventListener("resize", resizeCanvas);
   }, []);
 
-  // télécharge l'aperçu (ou l'image courante)
-  const downloadPreview = useCallback(() => {
-    const url = preview ?? sigRef.current?.toDataURL("image/png");
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "signature.png";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }, [preview]);
+  // Drag handlers
+  const onMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
+    setDragging(true);
+    dragOffset.current = {
+      x: e.clientX - sigX,
+      y: e.clientY - sigY,
+    };
+  };
+  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    setSigX(e.clientX - dragOffset.current.x);
+    setSigY(e.clientY - dragOffset.current.y);
+  };
+  const onMouseUp = () => setDragging(false);
+
+  // Export PDF avec signature
+  const exportPDF = async () => {
+    if (!file || !preview || !isClient) return;
+
+    try {
+      const { PDFDocument } = await import("pdf-lib");
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      const pngImage = await pdfDoc.embedPng(preview);
+      const pages = pdfDoc.getPages();
+      const firstPage = pages[0];
+
+      firstPage.drawImage(pngImage, {
+        x: sigX,
+        y: firstPage.getHeight() - sigY - 50, // ajuster selon position canvas
+        width: sigWidth,
+        height: sigWidth * 0.4,
+      });
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([new Uint8Array(pdfBytes)], {
+        type: "application/pdf",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "document_signe.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+    }
+  };
 
   return (
     <div className="min-h-screen p-8">
       <h1 className="text-2xl mb-3">Signature document</h1>
 
-      <div className="flex gap-4">
-        {/* colonne gauche : canvas + contrôles */}
+      <div className="flex flex-col gap-4">
+        {/* Canvas et contrôles */}
         <div className="max-w-[100%]">
           <div className="flex gap-2.5 mb-4">
             <button
-              onClick={() => {
-                clear();
-              }}
-              className="p-2 bg-red-500 hover:opacity-90 text-white rounded-md"
+              onClick={clear}
+              className="p-2 bg-red-500 text-white rounded-md"
             >
               Effacer
             </button>
-
             <button
               onClick={saveSignature}
-              className="p-2 bg-green-500 hover:opacity-90 text-white rounded-md disabled:opacity-50"
               disabled={isEmpty}
+              className="p-2 bg-green-500 text-white rounded-md"
             >
               Enregistrer
             </button>
-
             <button
               onClick={undo}
-              className="p-2 bg-gray-200 text-black rounded-md hover:opacity-90 disabled:opacity-50"
               disabled={isEmpty}
-              title="Annuler le dernier trait"
+              className="p-2 bg-white hover:opacity-90 rounded-md text-black"
             >
               Retour
             </button>
-
             <button
-              onClick={downloadPreview}
-              className="p-2 bg-white text-black rounded-md hover:opacity-90 border"
-              disabled={isEmpty && !preview}
+              onClick={exportPDF}
+              disabled={!preview || !file}
+              className="p-2 bg-blue-500 text-white rounded-md"
             >
-              Télécharger
+              Export PDF signé
             </button>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="">
-              <div className="border border-gray-300 rounded-md">
-                <canvas ref={canvasRef} className="block touch-action-none" />
-              </div>
+            <div className="border border-gray-300 rounded-md">
+              <canvas ref={canvasRef} className="block touch-action-none" />
             </div>
+
             <div className="p-3 border rounded-md bg-white w-full md:w-80">
               <h2 className="text-sm font-medium mb-2 text-black">
                 Aperçu de la signature
               </h2>
               {preview ? (
-                <div className="flex flex-col items-center gap-2">
-                  <img
-                    src={preview}
-                    alt="Aperçu signature"
-                    className="max-w-full border rounded w-full"
-                    style={{ maxHeight: 130, objectFit: "contain" }}
-                  />
-                  <div className="text-xs text-black">
-                    Format: PNG — prêt à être uploadé.
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      onClick={downloadPreview}
-                      className="px-3 py-1 rounded border text-sm bg-black text-white hover:opacity-90"
-                    >
-                      Télécharger
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Exemple: reset preview si user veut refaire
-                        setPreview(null);
-                        setPreviewBlob(null);
-                      }}
-                      className="px-3 py-1 rounded border text-sm bg-black text-white hover:opacity-90"
-                    >
-                      Refaire
-                    </button>
-                  </div>
-                </div>
+                <img
+                  src={preview}
+                  alt="Aperçu signature"
+                  style={{
+                    position: "relative",
+                    width: sigWidth,
+                    objectFit: "contain",
+                  }}
+                  onMouseDown={onMouseDown}
+                  onMouseUp={onMouseUp}
+                />
               ) : (
                 <div className="text-sm text-black text-center">
                   Aucun aperçu — clique sur Enregistrer pour générer l'image.
@@ -224,8 +265,42 @@ export default function SignaturePage() {
           </div>
         </div>
 
-        {/* colonne droite : aperçu (à côté du drawer) */}
-        <aside className="w-80 flex-shrink-0"></aside>
+        {/* PDF upload + aperçu */}
+        <div
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          style={{ position: "relative" }}
+        >
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="block text-sm border border-gray-300 rounded-md p-2 mb-2"
+          />
+          {file && isClient && (
+            <PDFViewer
+              file={file}
+              onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+              width={700}
+            />
+          )}
+          {/* signature superposée */}
+          {preview && (
+            <img
+              src={preview}
+              alt="Signature"
+              style={{
+                position: "absolute",
+                top: sigY,
+                left: sigX,
+                width: sigWidth,
+                cursor: "grab",
+              }}
+              onMouseDown={onMouseDown}
+              onMouseUp={onMouseUp}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
