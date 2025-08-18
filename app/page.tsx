@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { PDFDocument } from "pdf-lib";
+import React, { useRef, useState, useCallback } from "react";
+import SignatureCanvas from "react-signature-canvas";
+import jsPDF from "jspdf";
 import { Document, Page, pdfjs } from "react-pdf";
 import {
   Download,
@@ -13,10 +14,11 @@ import {
   Move,
   ZoomIn,
   ZoomOut,
+  Save,
 } from "lucide-react";
 
 // Configuration PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 interface SignaturePosition {
   x: number;
@@ -26,15 +28,12 @@ interface SignaturePosition {
   height: number;
 }
 
-export default function SignaturePage() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const signaturePadRef = useRef<any>(null);
-  const [isEmpty, setIsEmpty] = useState(true);
+export default function page() {
+  const sigCanvasRef = useRef<SignatureCanvas>(null);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [isClient, setIsClient] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [pdfScale, setPdfScale] = useState(1.2);
   const [signaturePositions, setSignaturePositions] = useState<
@@ -45,99 +44,34 @@ export default function SignaturePage() {
   );
   const [isDragging, setIsDragging] = useState(false);
 
-  // Setup client-side environment
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Initialize signature pad
-  useEffect(() => {
-    if (!isClient) return;
-
-    const initSignaturePad = async () => {
-      const SignaturePad = (await import("signature_pad")).default;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const pad = new SignaturePad(canvas, {
-        penColor: "#1f2937",
-        backgroundColor: "#ffffff",
-        minWidth: 1,
-        maxWidth: 3,
-        throttle: 16,
-        minDistance: 5,
-      });
-
-      signaturePadRef.current = pad;
-
-      pad.onBegin = () => setIsEmpty(false);
-      pad.onEnd = () => setIsEmpty(pad.isEmpty());
-
-      const resizeCanvas = () => {
-        const ratio = Math.max(window.devicePixelRatio || 1, 1);
-        const parent = canvas.parentElement;
-        if (!parent) return;
-
-        const rect = parent.getBoundingClientRect();
-        const width = Math.min(600, rect.width - 32);
-        const height = 200;
-
-        canvas.width = Math.round(width * ratio);
-        canvas.height = Math.round(height * ratio);
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-        }
-
-        pad.clear();
-        setIsEmpty(true);
-      };
-
-      resizeCanvas();
-      window.addEventListener("resize", resizeCanvas);
-
-      return () => {
-        window.removeEventListener("resize", resizeCanvas);
-        pad.off();
-      };
-    };
-
-    initSignaturePad();
-  }, [isClient]);
-
+  // Sauvegarder la signature
   const saveSignature = useCallback(() => {
-    const pad = signaturePadRef.current;
-    if (!pad || pad.isEmpty()) return;
-
-    const dataUrl = pad.toDataURL("image/png", 1.0);
-    setSignaturePreview(dataUrl);
+    if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty()) {
+      const dataUrl = sigCanvasRef.current.toDataURL("image/png");
+      setSignaturePreview(dataUrl);
+    }
   }, []);
 
+  // Effacer la signature
   const clearSignature = useCallback(() => {
-    signaturePadRef.current?.clear();
-    setIsEmpty(true);
-    setSignaturePreview(null);
-  }, []);
-
-  const undoSignature = useCallback(() => {
-    const pad = signaturePadRef.current;
-    if (!pad) return;
-
-    const data = pad.toData();
-    if (data.length === 0) return;
-
-    data.pop();
-    pad.fromData(data);
-    setIsEmpty(pad.isEmpty());
-
-    if (pad.isEmpty()) {
+    if (sigCanvasRef.current) {
+      sigCanvasRef.current.clear();
       setSignaturePreview(null);
     }
   }, []);
 
+  // Annuler le dernier trait
+  const undoSignature = useCallback(() => {
+    if (sigCanvasRef.current) {
+      const data = sigCanvasRef.current.toData();
+      if (data.length > 0) {
+        data.pop();
+        sigCanvasRef.current.fromData(data);
+      }
+    }
+  }, []);
+
+  // Gérer l'upload de fichier PDF
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -155,6 +89,7 @@ export default function SignaturePage() {
     setNumPages(numPages);
   };
 
+  // Ajouter une signature à la page
   const addSignatureToPage = () => {
     if (!signaturePreview) return;
 
@@ -170,11 +105,13 @@ export default function SignaturePage() {
     setSelectedSignature(signaturePositions.length);
   };
 
+  // Supprimer une signature
   const removeSignature = (index: number) => {
     setSignaturePositions((prev) => prev.filter((_, i) => i !== index));
     setSelectedSignature(null);
   };
 
+  // Gérer le drag des signatures
   const handleSignatureMouseDown = (index: number, e: React.MouseEvent) => {
     e.preventDefault();
     setSelectedSignature(index);
@@ -205,47 +142,38 @@ export default function SignaturePage() {
     setIsDragging(false);
   };
 
-  const exportSignedPDF = async () => {
-    if (!pdfFile || !signaturePreview || signaturePositions.length === 0)
-      return;
+  // Créer un nouveau PDF avec signatures uniquement
+  const createSignaturePDF = async () => {
+    if (!signaturePreview) return;
 
     setIsExporting(true);
 
     try {
-      const arrayBuffer = await pdfFile.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
-      const pngImage = await pdfDoc.embedPng(signaturePreview);
-      const pages = pdfDoc.getPages();
+      const pdf = new jsPDF("p", "mm", "a4");
 
-      signaturePositions.forEach((sigPos) => {
-        const page = pages[sigPos.page - 1];
-        if (!page) return;
+      // Ajouter la signature au centre de la page
+      const pageWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+      const sigWidth = 60;
+      const sigHeight = 30;
+      const x = (pageWidth - sigWidth) / 2;
+      const y = (pageHeight - sigHeight) / 2;
 
-        const { width: pageWidth, height: pageHeight } = page.getSize();
+      pdf.addImage(signaturePreview, "PNG", x, y, sigWidth, sigHeight);
 
-        // Conversion des coordonnées (l'origine PDF est en bas à gauche)
-        const pdfX = (sigPos.x / 600) * pageWidth; // 600 est la largeur approximative du viewer
-        const pdfY = pageHeight - (sigPos.y / 800) * pageHeight - sigPos.height; // 800 hauteur approximative
+      // Ajouter un titre
+      pdf.setFontSize(16);
+      pdf.text("Document de Signature", pageWidth / 2, 30, { align: "center" });
 
-        page.drawImage(pngImage, {
-          x: pdfX,
-          y: pdfY,
-          width: sigPos.width,
-          height: sigPos.height,
-        });
-      });
+      pdf.setFontSize(10);
+      pdf.text(
+        `Créé le ${new Date().toLocaleDateString("fr-FR")}`,
+        pageWidth / 2,
+        y + sigHeight + 20,
+        { align: "center" }
+      );
 
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${pdfFile.name.replace(".pdf", "")}_signé.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      pdf.save("signature.pdf");
     } catch (error) {
       console.error("Erreur lors de l'export:", error);
       alert("Erreur lors de l'export du PDF");
@@ -254,13 +182,57 @@ export default function SignaturePage() {
     }
   };
 
-  if (!isClient) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  // Exporter PDF avec signatures positionnées (version simplifiée)
+  const exportSignedPDF = async () => {
+    if (!signaturePreview) return;
+
+    setIsExporting(true);
+
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+
+      if (signaturePositions.length > 0) {
+        // Créer une page pour chaque signature
+        signaturePositions.forEach((sigPos, index) => {
+          if (index > 0) {
+            pdf.addPage();
+          }
+
+          // Convertir les coordonnées pixel en mm
+          const x = (sigPos.x * 210) / 600;
+          const y = (sigPos.y * 297) / 800;
+          const width = (sigPos.width * 210) / 600;
+          const height = (sigPos.height * 297) / 800;
+
+          pdf.addImage(signaturePreview, "PNG", x, y, width, height);
+
+          pdf.setFontSize(10);
+          pdf.text(`Page ${sigPos.page}`, x, y - 5);
+        });
+      } else {
+        // Si pas de positions, créer un PDF simple avec la signature
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const sigWidth = 60;
+        const sigHeight = 30;
+        const x = (pageWidth - sigWidth) / 2;
+        const y = (pageHeight - sigHeight) / 2;
+
+        pdf.addImage(signaturePreview, "PNG", x, y, sigWidth, sigHeight);
+      }
+
+      const fileName = pdfFile
+        ? `${pdfFile.name.replace(".pdf", "")}_signé.pdf`
+        : "document_signé.pdf";
+
+      pdf.save(fileName);
+    } catch (error) {
+      console.error("Erreur lors de l'export:", error);
+      alert("Erreur lors de l'export du PDF");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -275,7 +247,7 @@ export default function SignaturePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="flex flex-col gap-8">
           {/* Section Signature */}
           <div className="bg-white rounded-2xl shadow-xl p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -288,11 +260,20 @@ export default function SignaturePage() {
             </div>
 
             {/* Canvas de signature */}
-            <div className="border-2 border-dashed border-gray-300 rounded-xl mb-6 overflow-hidden bg-gray-50">
-              <canvas
-                ref={canvasRef}
-                className="block w-full cursor-crosshair bg-white"
-                style={{ touchAction: "none" }}
+            <div className="border-2 border-dashed border-gray-300 rounded-xl mb-6 overflow-hidden min-h-72 bg-gray-50 p-4">
+              <SignatureCanvas
+                ref={sigCanvasRef}
+                penColor="#1f2937"
+                backgroundColor="#ffffff"
+                minWidth={1}
+                maxWidth={3}
+                throttle={16}
+                minDistance={5}
+                canvasProps={{
+                  height: 500,
+                  className: "sigCanvas border rounded-lg bg-white w-full",
+                }}
+                clearOnResize={false}
               />
             </div>
 
@@ -307,18 +288,16 @@ export default function SignaturePage() {
               </button>
               <button
                 onClick={undoSignature}
-                // disabled={isEmpty} 
-                className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 disabled:bg-gray-300 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
               >
                 <RotateCcw className="h-4 w-4" />
                 Annuler
               </button>
               <button
                 onClick={saveSignature}
-                disabled={isEmpty}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-300 text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
               >
-                <Download className="h-4 w-4" />
+                <Save className="h-4 w-4" />
                 Enregistrer
               </button>
             </div>
@@ -336,15 +315,25 @@ export default function SignaturePage() {
                     className="max-w-full h-auto"
                   />
                 </div>
-                {pdfFile && (
+                <div className="mt-3 space-y-2">
                   <button
-                    onClick={addSignatureToPage}
-                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                    onClick={createSignaturePDF}
+                    disabled={isExporting}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 text-white rounded-lg transition-colors"
                   >
-                    <Move className="h-4 w-4" />
-                    Ajouter à la page {currentPage}
+                    <Download className="h-4 w-4" />
+                    Créer PDF de signature
                   </button>
-                )}
+                  {pdfFile && (
+                    <button
+                      onClick={addSignatureToPage}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                    >
+                      <Move className="h-4 w-4" />
+                      Ajouter à la page {currentPage}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
