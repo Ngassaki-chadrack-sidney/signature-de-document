@@ -48,6 +48,7 @@ export default function SignaturePage() {
   const [selectedSignature, setSelectedSignature] = useState<number | null>(
     null
   );
+  
 
   // Setup client-side environment
   useEffect(() => {

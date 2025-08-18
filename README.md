@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# front-signature
 
-## Getting Started
+> Application web développée avec [Next.js](https://nextjs.org), TypeScript et TailwindCSS.
 
-First, run the development server:
+## Description du projet
+
+front-signature est une application web moderne dédiée à la signature électronique de documents PDF existants. Elle offre une solution professionnelle pour la gestion et l'apposition de signatures sur vos fichiers PDF, en s'appuyant sur une stack technologique performante :
+
+- **Next.js** (React, SSR, SSG)
+- **TypeScript** (typage statique)
+- **TailwindCSS** (framework utilitaire pour le style)
+- **Vercel** (déploiement recommandé)
+
+## Prérequis
+
+- Node.js >= 18
+- npm, yarn, pnpm ou bun
+
+## Installation
+
+Clonez le dépôt puis installez les dépendances :
+
+```bash
+# Cloner le projet
+git clone <url-du-repo>
+cd front-signature
+
+# Installer les dépendances
+npm install
+# ou
+yarn install
+# ou
+pnpm install
+# ou
+bun install
+```
+
+## Démarrer le serveur de développement
 
 ```bash
 npm run dev
-# or
+# ou
 yarn dev
-# or
+# ou
 pnpm dev
-# or
+# ou
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur pour voir l'application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Structure du projet
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `app/` : pages et composants principaux
+- `public/` : fichiers statiques (images, icônes)
+- `globals.css` : styles globaux
+- `next.config.ts` : configuration Next.js
+- `tailwind.config.js` : configuration de TailwindCSS
 
-## Learn More
+## Modifier la page principale
 
-To learn more about Next.js, take a look at the following resources:
+Éditez le fichier `app/page.tsx` pour personnaliser la page d'accueil. Les modifications sont automatiquement prises en compte.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Déploiement
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Le déploiement le plus simple se fait sur [Vercel](https://vercel.com/new).
+Documentation officielle :
 
-## Deploy on Vercel
+- [Déployer une app Next.js sur Vercel](https://nextjs.org/docs/app/building-your-application/deploying)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Ressources utiles
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Documentation Next.js](https://nextjs.org/docs)
+- [Tutoriel interactif Next.js](https://nextjs.org/learn)
+- [Dépôt GitHub Next.js](https://github.com/vercel/next.js)
+- [Documentation TailwindCSS](https://tailwindcss.com/docs)
+
+## Auteur
+
+NGASSAKI Chadrack Sidney
+
+---
+
+Ce projet est sous licence MIT. N'hésitez pas à contribuer !
