@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { PDFDocument } from "pdf-lib";
 import { Document, Page, pdfjs } from "react-pdf";
+import { Rnd } from "react-rnd";
 import {
   Download,
   FileText,
@@ -13,6 +14,7 @@ import {
   Move,
   ZoomIn,
   ZoomOut,
+  Palette,
 } from "lucide-react";
 
 // Configuration PDF.js worker
@@ -42,10 +44,10 @@ export default function SignaturePage() {
   const [signaturePositions, setSignaturePositions] = useState<
     SignaturePosition[]
   >([]);
+  const [color, setColor] = useState<string>("black");
   const [selectedSignature, setSelectedSignature] = useState<number | null>(
     null
   );
-  const [isDragging, setIsDragging] = useState(false);
 
   // Setup client-side environment
   useEffect(() => {
@@ -62,8 +64,8 @@ export default function SignaturePage() {
       if (!canvas) return;
 
       const pad = new SignaturePad(canvas, {
-        penColor: "#1f2937",
-        backgroundColor: "#ffffff",
+        penColor: color,
+        backgroundColor: "transparent",
         minWidth: 1,
         maxWidth: 3,
         throttle: 16,
@@ -109,6 +111,13 @@ export default function SignaturePage() {
 
     initSignaturePad();
   }, [isClient]);
+
+  // useEffect pour gerer la couleur de la signature
+  useEffect(() => {
+    if (signaturePadRef.current) {
+      signaturePadRef.current.penColor = color;
+    }
+  }, [color]);
 
   const saveSignature = useCallback(() => {
     const pad = signaturePadRef.current;
@@ -177,34 +186,26 @@ export default function SignaturePage() {
     setSelectedSignature(null);
   };
 
-  const handleSignatureMouseDown = (index: number, e: React.MouseEvent) => {
-    e.preventDefault();
-    setSelectedSignature(index);
-    setIsDragging(true);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || selectedSignature === null) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
+  const updateSignaturePosition = (
+    index: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) => {
     setSignaturePositions((prev) =>
-      prev.map((sig, index) =>
-        index === selectedSignature
+      prev.map((sig, i) =>
+        i === index
           ? {
               ...sig,
-              x: Math.max(0, x - sig.width / 2),
-              y: Math.max(0, y - sig.height / 2),
+              x,
+              y,
+              width,
+              height,
             }
           : sig
       )
     );
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
   };
 
   const exportSignedPDF = async () => {
@@ -293,8 +294,12 @@ export default function SignaturePage() {
             <div className="border-2 border-dashed border-gray-300 rounded-xl mb-6 overflow-hidden bg-gray-50">
               <canvas
                 ref={canvasRef}
-                className="block w-full cursor-crosshair bg-white"
-                style={{ touchAction: "none", width: "100%" }}
+                className="block w-full cursor-crosshair"
+                style={{
+                  touchAction: "none",
+                  width: "100%",
+                  backgroundColor: "transparent",
+                }}
               />
             </div>
 
@@ -322,6 +327,22 @@ export default function SignaturePage() {
                 <Download className="h-4 w-4" />
                 Enregistrer
               </button>
+              {/* <div>
+                <input
+                  type="color"
+                  onChange={(e) => setColor(e.target.value)}
+                  value={color}
+                />
+              </div> */}
+              <label className="flex items-center gap-2 text-white bg-gray-500 hover:bg-gray-600 rounded-lg px-4 py-2">
+                <Palette className="h-4 w-4" />
+                Changer de couleur
+                <input
+                  type="color"
+                  onChange={(e) => setColor(e.target.value)}
+                  value={color}
+                />
+              </label>
             </div>
 
             {/* Aperçu de la signature */}
@@ -433,12 +454,7 @@ export default function SignaturePage() {
                 </div>
 
                 {/* Viewer PDF */}
-                <div
-                  className="relative border rounded-xl overflow-hidden bg-white"
-                  onMouseMove={handleMouseMove}
-                  onMouseUp={handleMouseUp}
-                  onMouseLeave={handleMouseUp}
-                >
+                <div className="relative border rounded-xl overflow-hidden bg-white">
                   <Document
                     file={pdfFile}
                     onLoadSuccess={onDocumentLoadSuccess}
@@ -452,49 +468,85 @@ export default function SignaturePage() {
                     />
                   </Document>
 
-                  {/* Signatures overlay */}
+                  {/* Signatures overlay avec react-rnd */}
                   {signaturePositions
                     .filter((sig) => sig.page === currentPage)
-                    .map((signature, index) => (
-                      <div
-                        key={index}
-                        className={`absolute cursor-move border-2 ${
-                          selectedSignature ===
-                          signaturePositions.indexOf(signature)
-                            ? "border-blue-500 bg-blue-100/20"
-                            : "border-transparent hover:border-blue-300"
-                        } rounded`}
-                        style={{
-                          left: signature.x,
-                          top: signature.y,
-                          width: signature.width,
-                          height: signature.height,
-                        }}
-                        onMouseDown={(e) =>
-                          handleSignatureMouseDown(
-                            signaturePositions.indexOf(signature),
-                            e
-                          )
-                        }
-                      >
-                        <img
-                          src={signaturePreview!}
-                          alt="Signature"
-                          className="w-full h-full object-contain pointer-events-none"
-                          draggable={false}
-                        />
-                        <button
-                          onClick={() =>
-                            removeSignature(
-                              signaturePositions.indexOf(signature)
-                            )
-                          }
-                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                    .map((signature, index) => {
+                      const globalIndex = signaturePositions.indexOf(signature);
+                      return (
+                        <Rnd
+                          key={globalIndex}
+                          size={{
+                            width: signature.width,
+                            height: signature.height,
+                          }}
+                          position={{ x: signature.x, y: signature.y }}
+                          onDragStop={(e, d) => {
+                            updateSignaturePosition(
+                              globalIndex,
+                              d.x,
+                              d.y,
+                              signature.width,
+                              signature.height
+                            );
+                          }}
+                          onResizeStop={(
+                            e,
+                            direction,
+                            ref,
+                            delta,
+                            position
+                          ) => {
+                            updateSignaturePosition(
+                              globalIndex,
+                              position.x,
+                              position.y,
+                              parseInt(ref.style.width),
+                              parseInt(ref.style.height)
+                            );
+                          }}
+                          bounds="parent"
+                          className={`${
+                            selectedSignature === globalIndex
+                              ? "border-2 border-blue-500 bg-blue-100/20"
+                              : "border-2 border-transparent hover:border-blue-300"
+                          } rounded`}
+                          onClick={() => setSelectedSignature(globalIndex)}
+                          enableResizing={{
+                            top: true,
+                            right: true,
+                            bottom: true,
+                            left: true,
+                            topRight: true,
+                            bottomRight: true,
+                            bottomLeft: true,
+                            topLeft: true,
+                          }}
+                          minWidth={50}
+                          minHeight={25}
+                          maxWidth={300}
+                          maxHeight={150}
                         >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+                          <div className="w-full h-full relative">
+                            <img
+                              src={signaturePreview!}
+                              alt="Signature"
+                              className="w-full h-full object-contain pointer-events-none"
+                              draggable={false}
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeSignature(globalIndex);
+                              }}
+                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors z-10"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </Rnd>
+                      );
+                    })}
                 </div>
 
                 {/* Bouton export */}
@@ -502,7 +554,7 @@ export default function SignaturePage() {
                   <button
                     onClick={exportSignedPDF}
                     disabled={isExporting}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold transition-all transform hover:scale-105 disabled:scale-100"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3  bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white rounded-xl font-semibold"
                   >
                     {isExporting ? (
                       <>

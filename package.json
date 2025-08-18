@@ -17,6 +17,7 @@
     "react-dom": "19.1.0",
     "react-draggable": "^4.5.0",
     "react-pdf": "^10.0.1",
+    "react-rnd": "^10.5.2",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "signature_pad": "^5.0.10"
   },
