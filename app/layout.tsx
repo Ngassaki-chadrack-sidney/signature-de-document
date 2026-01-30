@@ -24,6 +24,7 @@ export default function RootLayout({
           name="keywords"
           content="signature électronique, signer PDF, signature en ligne, signature numérique, PDF signable, outil de signature, "
         />
+        <meta name="google-site-verification" content="jEZynX7ElAzbTXrm5ywwWwRtKqDVbzkL5Vefz8Oa2gE" />
       </Head>
       <body>{children}</body>
     </html>
