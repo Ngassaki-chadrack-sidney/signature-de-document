@@ -1,10 +1,50 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Head from 'next/head';
 
 export const metadata: Metadata = {
-  title: "Signature de documents PDF",
-  description: "APP Next de signature de documents PDF.",
+  title: {
+    default: "front-signature — Signez vos PDF en ligne",
+    template: "%s | front-signature",
+  },
+  description:
+    "Application web pour signer vos documents PDF en ligne, rapidement et en toute sécurité. Aucune installation requise.",
+  keywords: [
+    "signature électronique",
+    "signer PDF",
+    "signature en ligne",
+    "signature numérique",
+    "outil de signature",
+    "electronic signature",
+    "sign PDF",
+    "online signature",
+    "document signing",
+  ],
+  authors: [
+    {
+      name: "NGASSAKI Chadrack Sidney",
+      url: "https://github.com/chadrackngassaki",
+    },
+  ],
+  creator: "NGASSAKI Chadrack Sidney",
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    alternateLocale: "en_US",
+    siteName: "front-signature",
+    title: "front-signature — Signez vos PDF en ligne",
+    description:
+      "Application web pour signer vos documents PDF en ligne, rapidement et en toute sécurité.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "front-signature — Signez vos PDF en ligne",
+    description:
+      "Application web pour signer vos documents PDF en ligne, rapidement et en toute sécurité.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -13,20 +53,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <Head>
-        <title>SignDoc – Signez vos PDF en ligne</title>
-        <meta
-          name="description"
-          content="SignDoc vous permet de signer vos documents PDF en ligne, rapidement et en toute sécurité. Aucune installation requise. Essayez gratuitement dès maintenant !"
-        />
-        <meta
-          name="keywords"
-          content="signature électronique, signer PDF, signature en ligne, signature numérique, PDF signable, outil de signature, "
-        />
-        <meta name="google-site-verification" content="jEZynX7ElAzbTXrm5ywwWwRtKqDVbzkL5Vefz8Oa2gE" />
-      </Head>
-      <body>{children}</body>
+    <html lang="fr" suppressHydrationWarning>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }

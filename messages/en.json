@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "front-signature",
+    "tagline": "Sign your PDF documents with ease"
+  },
+  "header": {
+    "nav": {
+      "home": "Home",
+      "sign": "Sign",
+      "about": "About"
+    },
+    "language": "Language",
+    "theme": {
+      "light": "Light",
+      "dark": "Dark"
+    }
+  },
+  "dropzone": {
+    "idle": {
+      "title": "Drop your PDF here",
+      "subtitle": "or click to browse",
+      "hint": "PDF only"
+    },
+    "dragover": {
+      "title": "Drop the file"
+    },
+    "rejected": {
+      "title": "Format not supported",
+      "subtitle": "Only PDF files are allowed"
+    },
+    "uploading": {
+      "title": "Processing..."
+    },
+    "error": {
+      "too_large": "File exceeds maximum size of {size}",
+      "invalid_type": "Invalid file format. Please select a PDF",
+      "upload_failed": "File upload failed"
+    }
+  },
+  "signature": {
+    "title": "Create your signature",
+    "canvas_placeholder": "Sign here",
+    "actions": {
+      "clear": "Clear",
+      "undo": "Undo",
+      "save": "Save",
+      "color": "Color"
+    },
+    "preview": "Preview",
+    "add_to_page": "Add to page {page}",
+    "toast": {
+      "saved": "Signature saved",
+      "cleared": "Signature cleared"
+    }
+  },
+  "document": {
+    "title": "Your document",
+    "status": {
+      "pending": "Pending",
+      "signed": "Signed",
+      "rejected": "Rejected"
+    },
+    "controls": {
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {current} of {total}"
+    },
+    "export": {
+      "button": "Download signed PDF",
+      "progress": "Exporting...",
+      "success": "Signed PDF downloaded successfully",
+      "error": "Error exporting PDF"
+    },
+    "empty": "No document loaded",
+    "toast": {
+      "uploaded": "PDF uploaded successfully",
+      "signed": "Signature added to document"
+    }
+  },
+  "stepper": {
+    "upload": "Upload",
+    "sign": "Sign",
+    "download": "Download"
+  },
+  "footer": {
+    "built_by": "Built by",
+    "role": "Full Stack Developer",
+    "source": "Source code",
+    "coffee": "Buy me a coffee"
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "retry": "Retry"
+  }
+}

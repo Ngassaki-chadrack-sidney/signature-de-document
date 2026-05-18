@@ -1,0 +1,97 @@
+{
+  "app": {
+    "name": "front-signature",
+    "tagline": "Signez vos documents PDF en toute simplicité"
+  },
+  "header": {
+    "nav": {
+      "home": "Accueil",
+      "sign": "Signer",
+      "about": "À propos"
+    },
+    "language": "Langue",
+    "theme": {
+      "light": "Clair",
+      "dark": "Sombre"
+    }
+  },
+  "dropzone": {
+    "idle": {
+      "title": "Déposez votre PDF ici",
+      "subtitle": "ou cliquez pour parcourir",
+      "hint": "PDF uniquement"
+    },
+    "dragover": {
+      "title": "Déposez le fichier"
+    },
+    "rejected": {
+      "title": "Format non accepté",
+      "subtitle": "Seuls les fichiers PDF sont autorisés"
+    },
+    "uploading": {
+      "title": "Traitement en cours..."
+    },
+    "error": {
+      "too_large": "Le fichier dépasse la taille maximale de {size}",
+      "invalid_type": "Format de fichier invalide. Veuillez sélectionner un PDF",
+      "upload_failed": "Échec du chargement du fichier"
+    }
+  },
+  "signature": {
+    "title": "Créer votre signature",
+    "canvas_placeholder": "Signez ici",
+    "actions": {
+      "clear": "Effacer",
+      "undo": "Annuler",
+      "save": "Enregistrer",
+      "color": "Couleur"
+    },
+    "preview": "Aperçu",
+    "add_to_page": "Ajouter à la page {page}",
+    "toast": {
+      "saved": "Signature enregistrée",
+      "cleared": "Signature effacée"
+    }
+  },
+  "document": {
+    "title": "Votre document",
+    "status": {
+      "pending": "En attente",
+      "signed": "Signé",
+      "rejected": "Rejeté"
+    },
+    "controls": {
+      "zoom_in": "Zoom avant",
+      "zoom_out": "Zoom arrière",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "page": "Page {current} sur {total}"
+    },
+    "export": {
+      "button": "Télécharger le PDF signé",
+      "progress": "Export en cours...",
+      "success": "PDF signé téléchargé avec succès",
+      "error": "Erreur lors de l'export du PDF"
+    },
+    "empty": "Aucun document chargé",
+    "toast": {
+      "uploaded": "PDF chargé avec succès",
+      "signed": "Signature ajoutée au document"
+    }
+  },
+  "stepper": {
+    "upload": "Charger",
+    "sign": "Signer",
+    "download": "Télécharger"
+  },
+  "footer": {
+    "built_by": "Développé par",
+    "role": "Développeur Full Stack",
+    "source": "Code source",
+    "coffee": "Buy me a coffee"
+  },
+  "errors": {
+    "generic": "Une erreur est survenue",
+    "retry": "Réessayer"
+  }
+}
